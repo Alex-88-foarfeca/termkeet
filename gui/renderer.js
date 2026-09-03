@@ -1,7 +1,7 @@
 'use strict'
 
 /*
- * termkeet GUI — renderer.
+ * Poiana lui Iocan GUI — renderer.
  *
  * Draws a real terminal emulator (xterm.js) styled like macOS Terminal.app,
  * with a genuine blinking block cursor, and implements just enough of a
@@ -116,7 +116,7 @@ term.onData((data) => {
 
 // ---- app flow: create/join -> name -> chat ----
 
-writeln(`${ANSI.bold}termkeet${ANSI.reset} — minimal P2P terminal chat`)
+writeln(`${ANSI.bold}Poiana lui Iocan${ANSI.reset} — minimal P2P terminal chat`)
 writeln(`${ANSI.dim}no servers, no accounts, no history — just Hyperswarm's P2P DHT${ANSI.reset}`)
 writeln('')
 askForRoom()

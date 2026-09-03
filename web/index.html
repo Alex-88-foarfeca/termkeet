@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
-<title>Termkeet</title>
+<title>Poiana lui Iocan</title>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
 <style>
   :root {
@@ -35,6 +35,7 @@
   }
 
   .app {
+    position: relative;
     width: 100%;
     max-width: 480px;
     min-height: 100vh;
@@ -45,6 +46,32 @@
     border-left: 1px solid var(--panel-line);
     border-right: 1px solid var(--panel-line);
   }
+
+  /* ---- disconnect overlay ---- */
+  .overlay {
+    position: absolute;
+    inset: 0;
+    z-index: 20;
+    background: rgba(18, 21, 26, .94);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    padding: 28px;
+    text-align: center;
+    font-family: var(--mono);
+  }
+  .overlay .ov-title { font-size: 14px; color: var(--fg); letter-spacing: .02em; }
+  .overlay .ov-count {
+    font-size: 44px;
+    font-weight: 600;
+    color: var(--accent);
+    font-variant-numeric: tabular-nums;
+  }
+  .overlay .ov-count.warn { color: var(--danger); }
+  .overlay .ov-sub { font-size: 12.5px; color: var(--dim); line-height: 1.6; max-width: 280px; }
+  .overlay .btn { max-width: 220px; }
 
   /* ---- title bar ---- */
   .titlebar {
@@ -64,13 +91,17 @@
   }
   .dot.live { background: var(--accent); box-shadow: 0 0 0 3px rgba(79,214,138,.15); }
   .dot.err { background: var(--danger); box-shadow: 0 0 0 3px rgba(226,104,92,.15); }
-  .brand { font-family: var(--mono); font-weight: 600; font-size: 15px; letter-spacing: .01em; }
+  .brand { font-family: var(--mono); font-weight: 600; font-size: 13px; letter-spacing: .01em; white-space: nowrap; flex: none; }
   .status {
     margin-left: auto;
+    min-width: 0;
     font-size: 12px;
     color: var(--dim);
     font-family: var(--mono);
     text-align: right;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* ---- terminal log ---- */
@@ -91,15 +122,30 @@
   .line.chat.peer .who { color: var(--accent2); }
   .line.chat .ts { color: var(--dim); font-size: 11.5px; margin-right: 6px; }
 
-  .cursor {
-    display: inline-block;
-    width: .55em; height: 1.05em;
-    background: var(--accent);
-    vertical-align: text-bottom;
+  @keyframes blink { 50% { opacity: 0; } }
+
+  /* Custom text caret: a blinking "_" (terminal style) instead of the
+     native "|". The input's real caret is made transparent; `.caret` is a
+     "_" positioned over the text by measuring `.caretmirror` (a hidden copy
+     of the text before the caret, in the exact same font). */
+  .caretwrap { position: relative; display: flex; flex: 1 1 auto; min-width: 0; }
+  .caretwrap > input[type="text"] { flex: 1 1 auto; width: 100%; }
+  .caretmirror {
+    position: absolute; left: 0; top: 0;
+    visibility: hidden; pointer-events: none;
+    white-space: pre;
+  }
+  .caret {
+    position: absolute;
+    bottom: 11px;
+    font-family: var(--mono);
+    font-size: 16px;
+    line-height: 1;
+    color: var(--accent);
+    pointer-events: none;
     animation: blink 1s step-end infinite;
   }
-  @keyframes blink { 50% { opacity: 0; } }
-  @media (prefers-reduced-motion: reduce) { .cursor { animation: none; opacity: .6; } }
+  @media (prefers-reduced-motion: reduce) { .caret { animation: none; opacity: .7; } }
 
   /* ---- controls area ---- */
   .controls {
@@ -181,18 +227,19 @@
   <div class="app">
     <div class="titlebar">
       <div class="dot" id="dot"></div>
-      <div class="brand">termkeet</div>
+      <div class="brand">Poiana lui Iocan</div>
       <div class="status" id="status">neconectat</div>
     </div>
     <div class="log" id="log" aria-live="polite"></div>
     <div class="controls" id="controls"></div>
+    <div class="overlay" id="overlay" style="display:none"></div>
   </div>
 
 <script>
 'use strict'
 
 /*
- * Termkeet — web (WebRTC) variant.
+ * Poiana lui Iocan — web (WebRTC) variant.
  *
  * Same idea as the desktop app: a private, minimal, P2P chat between two
  * people, no accounts, no chat history kept anywhere. This variant runs in
@@ -212,6 +259,7 @@ const log = document.getElementById('log')
 const controls = document.getElementById('controls')
 const dot = document.getElementById('dot')
 const statusEl = document.getElementById('status')
+const overlayEl = document.getElementById('overlay')
 
 const ICE_SERVERS = [
   {
@@ -244,6 +292,8 @@ let dc = null
 let myName = 'anon'
 let peerName = 'peer'
 let keepaliveTimer = null
+let overlayTimer = null
+let everConnected = false // true once the DataChannel has opened at least once
 
 // ---------------- log helpers ----------------
 
@@ -278,6 +328,104 @@ function addChat (name, text, self) {
 function setStatus (text, kind) {
   statusEl.textContent = text
   dot.className = 'dot' + (kind ? ' ' + kind : '')
+}
+
+// ---------------- underscore caret ----------------
+
+// Swap a text input's native "|" caret for a blinking "_". Call it after the
+// input is in the DOM. Works for any font by measuring a hidden mirror of the
+// text up to the caret; tracks selection and horizontal scroll.
+function underscoreCaret (input) {
+  input.style.caretColor = 'transparent'
+
+  const wrap = document.createElement('span')
+  wrap.className = 'caretwrap'
+  input.replaceWith(wrap)
+  wrap.appendChild(input)
+
+  const mirror = document.createElement('span')
+  mirror.className = 'caretmirror'
+  const caret = document.createElement('span')
+  caret.className = 'caret'
+  caret.textContent = '_'
+  wrap.append(mirror, caret)
+
+  function sync () {
+    const cs = getComputedStyle(input)
+    mirror.style.fontFamily = cs.fontFamily
+    mirror.style.fontSize = cs.fontSize
+    mirror.style.fontWeight = cs.fontWeight
+    mirror.style.fontStyle = cs.fontStyle
+    mirror.style.letterSpacing = cs.letterSpacing
+    const pos = input.selectionStart == null ? input.value.length : input.selectionStart
+    mirror.textContent = input.value.slice(0, pos)
+    const padL = parseFloat(cs.paddingLeft) || 0
+    const padR = parseFloat(cs.paddingRight) || 0
+    const x = padL + mirror.offsetWidth - input.scrollLeft
+    caret.style.left = Math.max(padL, Math.min(x, input.clientWidth - padR - 2)) + 'px'
+    caret.style.display = (document.activeElement === input) ? 'block' : 'none'
+  }
+
+  const onEvt = () => requestAnimationFrame(sync)
+  ;['input', 'keyup', 'keydown', 'click', 'focus', 'blur', 'scroll'].forEach(
+    (ev) => input.addEventListener(ev, onEvt)
+  )
+  input._syncCaret = sync // let callers refresh after programmatic value changes
+  requestAnimationFrame(sync)
+}
+
+// ---------------- disconnect overlay ----------------
+
+function hideOverlay () {
+  if (overlayTimer) { clearInterval(overlayTimer); overlayTimer = null }
+  overlayEl.style.display = 'none'
+  overlayEl.innerHTML = ''
+}
+
+// Counts down the grace window during a `disconnected` blip. If the link
+// comes back, hideOverlay() is called and this never expires. If it hits
+// zero, the connection is treated as gone.
+function showGraceCountdown (seconds) {
+  if (overlayTimer) clearInterval(overlayTimer)
+  let left = seconds
+  overlayEl.style.display = 'flex'
+  overlayEl.innerHTML =
+    '<div class="ov-title">conexiune instabilă</div>' +
+    '<div class="ov-count" id="ovCount">' + left + '</div>' +
+    '<div class="ov-sub">încerc să reiau legătura automat.<br>' +
+    'dacă ajunge la 0, creați o cameră nouă ca să continuați.</div>'
+  const countEl = document.getElementById('ovCount')
+  overlayTimer = setInterval(() => {
+    left--
+    if (countEl) {
+      countEl.textContent = left
+      if (left <= 5) countEl.classList.add('warn')
+    }
+    if (left <= 0) {
+      clearInterval(overlayTimer)
+      overlayTimer = null
+      showConnectionLost()
+    }
+  }, 1000)
+}
+
+function showConnectionLost () {
+  if (overlayTimer) { clearInterval(overlayTimer); overlayTimer = null }
+  stopKeepalive()
+  overlayEl.style.display = 'flex'
+  overlayEl.innerHTML = ''
+  const title = document.createElement('div')
+  title.className = 'ov-title'
+  title.textContent = 'conexiune pierdută'
+  const sub = document.createElement('div')
+  sub.className = 'ov-sub'
+  sub.textContent = 'legătura cu ' + peerName + ' s-a încheiat. creați o cameră nouă ca să continuați conversația.'
+  const btn = document.createElement('button')
+  btn.className = 'btn'
+  btn.textContent = 'Cameră nouă'
+  btn.onclick = () => { location.href = location.origin + location.pathname }
+  overlayEl.append(title, sub, btn)
+  setStatus('deconectat', 'err')
 }
 
 // ---------------- SDP <-> short code ----------------
@@ -406,32 +554,28 @@ function createPeerConnection () {
   const conn = new RTCPeerConnection({ iceServers: ICE_SERVERS })
 
   // `disconnected` is almost always transient (a network blip, a phone
-  // switching towers/wifi). Only `failed` is terminal. So on `disconnected`
-  // we just flag it and wait — if it hasn't recovered after a grace period,
-  // then it's really gone. This stops a 1-second hiccup from telling the
-  // user to reload.
-  let dropTimer = null
-  const clearDrop = () => { if (dropTimer) { clearTimeout(dropTimer); dropTimer = null } }
+  // switching towers/wifi). Only `failed` is terminal. On `disconnected` we
+  // show the countdown overlay and wait it out; if the link recovers the
+  // overlay is dismissed, if the countdown expires it's treated as lost.
+  const GRACE_SECONDS = 15
 
   conn.onconnectionstatechange = () => {
     const s = conn.connectionState
     if (s === 'connected') {
-      clearDrop()
+      hideOverlay()
       if (dc && dc.readyState === 'open') setStatus('conectat cu ' + peerName, 'live')
     } else if (s === 'disconnected') {
+      if (!everConnected) return
       setStatus('conexiune instabilă…', 'err')
-      clearDrop()
-      dropTimer = setTimeout(() => {
-        if (conn.connectionState !== 'connected') {
-          addLine('err', '[!] conexiunea nu s-a restabilit — reîncărcați pagina și creați o cameră nouă.')
-          setStatus('deconectat', 'err')
-        }
-      }, 15000)
+      showGraceCountdown(GRACE_SECONDS)
     } else if (s === 'failed') {
-      clearDrop()
       stopKeepalive()
-      addLine('err', '[!] conexiunea a eșuat — reîncărcați pagina și creați o cameră nouă.')
-      setStatus('deconectat', 'err')
+      if (everConnected) {
+        showConnectionLost()
+      } else {
+        addLine('err', '[!] nu s-a putut stabili conexiunea — reîncărcați pagina și încercați din nou.')
+        setStatus('eroare', 'err')
+      }
     }
   }
   return conn
@@ -440,6 +584,8 @@ function createPeerConnection () {
 function wireDataChannel (channel) {
   dc = channel
   dc.onopen = () => {
+    everConnected = true
+    hideOverlay()
     setStatus('conectat cu ' + peerName, 'live')
     addLine('sys', '[*] conexiune P2P deschisă — mesajele merg direct între voi, criptat.')
     startKeepalive()
@@ -448,7 +594,8 @@ function wireDataChannel (channel) {
   dc.onclose = () => {
     stopKeepalive()
     addLine('sys', '[*] conversația s-a încheiat (' + peerName + ' a plecat).')
-    setStatus('deconectat', 'err')
+    if (everConnected) showConnectionLost()
+    else setStatus('deconectat', 'err')
   }
   dc.onmessage = (e) => {
     let msg
@@ -495,6 +642,7 @@ function landing () {
   }
 
   controls.append(create, or, joinInput, join)
+  underscoreCaret(joinInput)
 }
 
 function askNameThen (next) {
@@ -515,6 +663,7 @@ function askNameThen (next) {
     Promise.resolve(next(myName)).catch(showFatal)
   }
   controls.append(label, input, go)
+  underscoreCaret(input)
   input.focus()
 }
 
@@ -566,6 +715,7 @@ async function startCreate () {
       }
     }
     controls.append(label, input, go)
+    underscoreCaret(input)
   }, link)
 }
 
@@ -598,7 +748,7 @@ async function startJoin (offerCode, name) {
   })(), 20000)
 
   addLine('sys', '[*] trimite codul de mai jos înapoi lui ' + peerName + ' ca să terminați conectarea:')
-  renderShare(null, 'Trimite codul de răspuns', null, code, 'termkeet — cod de răspuns:\n' + code + '\n\n(lipește-l în ecranul unde a fost creată camera)')
+  renderShare(null, 'Trimite codul de răspuns', null, code, 'Poiana lui Iocan — cod de răspuns:\n' + code + '\n\n(lipește-l în ecranul unde a fost creată camera)')
   addLine('hint', '    aștept ca ' + peerName + ' să finalizeze conectarea...')
   setStatus('în așteptare...')
 }
@@ -635,10 +785,10 @@ function renderShare (link, shareLabel, onManualNext, rawForCopy, shareTextOverr
   shareBtn.className = 'btn'
   shareBtn.textContent = shareLabel
   shareBtn.onclick = async () => {
-    const text = shareTextOverride || ('termkeet — invitație la chat: ' + link)
+    const text = shareTextOverride || ('Poiana lui Iocan — invitație la chat: ' + link)
     try {
       if (navigator.share) {
-        await navigator.share(link ? { title: 'termkeet', text: 'termkeet — invitație la chat', url: link } : { title: 'termkeet', text })
+        await navigator.share(link ? { title: 'Poiana lui Iocan', text: 'Poiana lui Iocan — invitație la chat', url: link } : { title: 'Poiana lui Iocan', text })
       } else {
         await navigator.clipboard.writeText(text)
         shareBtn.textContent = 'Copiat ✓ (lipește-l în orice app)'
@@ -684,6 +834,7 @@ function renderChat () {
     dc.send(JSON.stringify({ name: myName, text }))
     addChat(myName, text, true)
     input.value = ''
+    if (input._syncCaret) input._syncCaret()
   }
 
   send.onclick = submit
@@ -691,12 +842,26 @@ function renderChat () {
 
   row.append(prompt, input, send)
   controls.appendChild(row)
+  underscoreCaret(input)
   input.focus()
 }
 
+// Mobile browsers suspend a backgrounded tab and often tear down WebRTC while
+// you're in another app. When the page comes back to the foreground, re-check
+// the connection and surface the overlay instead of a frozen-looking chat.
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden || !everConnected || !pc) return
+  const s = pc.connectionState
+  if (s === 'failed' || s === 'closed' || (dc && dc.readyState !== 'open')) {
+    showConnectionLost()
+  } else if (s === 'disconnected') {
+    showGraceCountdown(15)
+  }
+})
+
 // ---------------- boot ----------------
 
-addLine('sys', 'termkeet — chat P2P direct între două telefoane.')
+addLine('sys', 'Poiana lui Iocan — chat P2P direct între două telefoane.')
 addLine('sys', 'fără cont, fără server, fără istoric — doar voi doi.')
 
 const initialCode = extractCode(location.hash.slice(1), 'o')

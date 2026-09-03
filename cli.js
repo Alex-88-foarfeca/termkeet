@@ -2,7 +2,7 @@
 'use strict'
 
 /*
- * termkeet — a minimalist terminal-based P2P chat.
+ * Poiana lui Iocan — a minimalist terminal-based P2P chat.
  *
  * Uses Hyperswarm (the same DHT-based P2P networking library that Keet /
  * the Holepunch stack is built on) to find and connect peers directly,
@@ -63,7 +63,7 @@ async function main () {
     rl.prompt(true)
   }
 
-  console.log(`${ANSI.bold}termkeet${ANSI.reset} — minimal P2P terminal chat`)
+  console.log(`${ANSI.bold}Poiana lui Iocan${ANSI.reset} — minimal P2P terminal chat`)
   console.log(`${ANSI.dim}room topic:${ANSI.reset} ${topic.toString('hex')}`)
   if (!arg) {
     console.log(`${ANSI.dim}share this invite code with others to let them join:${ANSI.reset}`)

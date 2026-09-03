@@ -1,6 +1,6 @@
-# termkeet — web
+# Poiana lui Iocan — web
 
-A phone-friendly, browser-based version of termkeet. Same values as the
+A phone-friendly, browser-based version of Poiana lui Iocan. Same values as the
 desktop app (no accounts, no chat history, direct/encrypted peer
 connection), but a different transport and a different signaling model,
 for reasons below.

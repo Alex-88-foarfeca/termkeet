@@ -1,7 +1,7 @@
 'use strict'
 
 /*
- * termkeet GUI — Electron main process.
+ * Poiana lui Iocan GUI — Electron main process.
  *
  * All P2P networking (Hyperswarm) lives here, with full Node access.
  * The renderer window has none: nodeIntegration is off and contextIsolation
@@ -130,7 +130,7 @@ function createWindow () {
     height: 460,
     minWidth: 420,
     minHeight: 260,
-    title: 'termkeet',
+    title: 'Poiana lui Iocan',
     backgroundColor: '#1e1e1e',
     titleBarStyle: 'default', // native window chrome — real macOS traffic lights, just like Terminal.app
     webPreferences: {

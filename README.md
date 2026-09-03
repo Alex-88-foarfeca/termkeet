@@ -1,4 +1,6 @@
-# termkeet
+# Poiana lui Iocan
+
+<sub>(package / repo name: `termkeet`)</sub>
 
 A minimalist, private peer-to-peer chat for friends and family. Built on
 **Hyperswarm** — the same DHT-based P2P networking library that powers
