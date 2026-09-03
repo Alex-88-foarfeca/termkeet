@@ -124,10 +124,10 @@
 
   @keyframes blink { 50% { opacity: 0; } }
 
-  /* Custom text caret: a blinking "_" (terminal style) instead of the
-     native "|". The input's real caret is made transparent; `.caret` is a
-     "_" positioned over the text by measuring `.caretmirror` (a hidden copy
-     of the text before the caret, in the exact same font). */
+  /* Custom text caret: a blinking green block (like a terminal cursor)
+     instead of the native "|". The input's real caret is made transparent;
+     `.caret` is a filled rectangle positioned over the text by measuring
+     `.caretmirror` (a hidden copy of the text before the caret, same font). */
   .caretwrap { position: relative; display: flex; flex: 1 1 auto; min-width: 0; }
   .caretwrap > input[type="text"] { flex: 1 1 auto; width: 100%; }
   .caretmirror {
@@ -137,11 +137,11 @@
   }
   .caret {
     position: absolute;
-    bottom: 11px;
-    font-family: var(--mono);
+    bottom: 8px;
+    width: .6em;
+    height: 1.25em;
     font-size: 16px;
-    line-height: 1;
-    color: var(--accent);
+    background: var(--accent);
     pointer-events: none;
     animation: blink 1s step-end infinite;
   }
@@ -330,12 +330,13 @@ function setStatus (text, kind) {
   dot.className = 'dot' + (kind ? ' ' + kind : '')
 }
 
-// ---------------- underscore caret ----------------
+// ---------------- block caret ----------------
 
-// Swap a text input's native "|" caret for a blinking "_". Call it after the
-// input is in the DOM. Works for any font by measuring a hidden mirror of the
-// text up to the caret; tracks selection and horizontal scroll.
-function underscoreCaret (input) {
+// Swap a text input's native "|" caret for a blinking green block (terminal
+// style). Call it after the input is in the DOM. Works for any font by
+// measuring a hidden mirror of the text up to the caret; tracks selection
+// and horizontal scroll.
+function blockCaret (input) {
   input.style.caretColor = 'transparent'
 
   const wrap = document.createElement('span')
@@ -347,7 +348,6 @@ function underscoreCaret (input) {
   mirror.className = 'caretmirror'
   const caret = document.createElement('span')
   caret.className = 'caret'
-  caret.textContent = '_'
   wrap.append(mirror, caret)
 
   function sync () {
@@ -399,7 +399,7 @@ function showGraceCountdown (seconds) {
     left--
     if (countEl) {
       countEl.textContent = left
-      if (left <= 5) countEl.classList.add('warn')
+      if (left <= 10) countEl.classList.add('warn')
     }
     if (left <= 0) {
       clearInterval(overlayTimer)
@@ -642,7 +642,7 @@ function landing () {
   }
 
   controls.append(create, or, joinInput, join)
-  underscoreCaret(joinInput)
+  blockCaret(joinInput)
 }
 
 function askNameThen (next) {
@@ -663,7 +663,7 @@ function askNameThen (next) {
     Promise.resolve(next(myName)).catch(showFatal)
   }
   controls.append(label, input, go)
-  underscoreCaret(input)
+  blockCaret(input)
   input.focus()
 }
 
@@ -715,7 +715,7 @@ async function startCreate () {
       }
     }
     controls.append(label, input, go)
-    underscoreCaret(input)
+    blockCaret(input)
   }, link)
 }
 
@@ -842,7 +842,7 @@ function renderChat () {
 
   row.append(prompt, input, send)
   controls.appendChild(row)
-  underscoreCaret(input)
+  blockCaret(input)
   input.focus()
 }
 

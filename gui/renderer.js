@@ -30,8 +30,8 @@ const term = new Terminal({
   theme: {
     background: '#1e1e1e',
     foreground: '#f2f2f2',
-    cursor: '#f2f2f2',
-    cursorAccent: '#1e1e1e',
+    cursor: '#5ff967',        // green block cursor, like a classic terminal
+    cursorAccent: '#1e1e1e',  // text under the block cursor
     selectionBackground: 'rgba(255,255,255,0.3)',
     black: '#000000', red: '#c91b00', green: '#00c200', yellow: '#c7c400',
     blue: '#0225c7', magenta: '#c930c7', cyan: '#00c5c7', white: '#c7c7c7',
