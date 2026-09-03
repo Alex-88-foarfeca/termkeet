@@ -1,0 +1,28 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>termkeet</title>
+<link rel="stylesheet" href="../node_modules/@xterm/xterm/css/xterm.css" />
+<style>
+  html, body {
+    height: 100%;
+    margin: 0;
+    background: #1e1e1e;
+    overflow: hidden;
+  }
+  #terminal {
+    height: 100%;
+    padding: 8px 0 0 10px;
+    box-sizing: border-box;
+  }
+  .xterm { height: 100%; }
+</style>
+</head>
+<body>
+  <div id="terminal"></div>
+  <script src="../node_modules/@xterm/xterm/lib/xterm.js"></script>
+  <script src="../node_modules/@xterm/addon-fit/lib/addon-fit.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

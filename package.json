@@ -1,0 +1,20 @@
+{
+  "name": "termkeet",
+  "version": "1.0.0",
+  "description": "Minimalist, private P2P chat for friends and family. No servers, no accounts, no tracking — powered by Hyperswarm. GUI looks and behaves exactly like macOS Terminal.",
+  "main": "gui/main.js",
+  "type": "commonjs",
+  "scripts": {
+    "postinstall": "node node_modules/electron/install.js",
+    "start": "electron .",
+    "cli": "node cli.js"
+  },
+  "dependencies": {
+    "@xterm/addon-fit": "^0.10.0",
+    "@xterm/xterm": "^5.5.0",
+    "hyperswarm": "^4.7.0"
+  },
+  "devDependencies": {
+    "electron": "^42.11.1"
+  }
+}

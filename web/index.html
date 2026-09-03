@@ -1,0 +1,660 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1" />
+<title>Termkeet</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root {
+    --bg: #12151a;
+    --panel: #181d24;
+    --panel-line: #232a33;
+    --fg: #e7ece7;
+    --dim: #7c8b96;
+    --accent: #4fd68a;   /* self / primary */
+    --accent2: #5fc3e0;  /* peer */
+    --danger: #e2685c;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+    --sans: "IBM Plex Sans", -apple-system, "Segoe UI", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    background: var(--bg);
+    color: var(--fg);
+    font-family: var(--sans);
+    -webkit-tap-highlight-color: transparent;
+  }
+  body {
+    display: flex;
+    justify-content: center;
+    min-height: 100%;
+  }
+
+  .app {
+    width: 100%;
+    max-width: 480px;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    background: var(--panel);
+    border-left: 1px solid var(--panel-line);
+    border-right: 1px solid var(--panel-line);
+  }
+
+  /* ---- title bar ---- */
+  .titlebar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--panel-line);
+    flex: none;
+  }
+  .dot {
+    width: 9px; height: 9px;
+    border-radius: 50%;
+    background: var(--dim);
+    flex: none;
+    transition: background .2s;
+  }
+  .dot.live { background: var(--accent); box-shadow: 0 0 0 3px rgba(79,214,138,.15); }
+  .dot.err { background: var(--danger); box-shadow: 0 0 0 3px rgba(226,104,92,.15); }
+  .brand { font-family: var(--mono); font-weight: 600; font-size: 15px; letter-spacing: .01em; }
+  .status {
+    margin-left: auto;
+    font-size: 12px;
+    color: var(--dim);
+    font-family: var(--mono);
+    text-align: right;
+  }
+
+  /* ---- terminal log ---- */
+  .log {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 14px 16px;
+    font-family: var(--mono);
+    font-size: 13.5px;
+    line-height: 1.55;
+  }
+  .line { white-space: pre-wrap; word-break: break-word; margin-bottom: 2px; }
+  .line.sys { color: var(--dim); }
+  .line.err { color: var(--danger); }
+  .line.hint { color: var(--dim); }
+  .line.chat .who { font-weight: 600; margin-right: 6px; }
+  .line.chat.self .who { color: var(--accent); }
+  .line.chat.peer .who { color: var(--accent2); }
+  .line.chat .ts { color: var(--dim); font-size: 11.5px; margin-right: 6px; }
+
+  .cursor {
+    display: inline-block;
+    width: .55em; height: 1.05em;
+    background: var(--accent);
+    vertical-align: text-bottom;
+    animation: blink 1s step-end infinite;
+  }
+  @keyframes blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) { .cursor { animation: none; opacity: .6; } }
+
+  /* ---- controls area ---- */
+  .controls {
+    flex: none;
+    border-top: 1px solid var(--panel-line);
+    padding: 14px 16px calc(14px + env(safe-area-inset-bottom));
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .btn {
+    font-family: var(--mono);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--bg);
+    background: var(--accent);
+    border: none;
+    border-radius: 8px;
+    padding: 13px 16px;
+    cursor: pointer;
+    text-align: center;
+  }
+  .btn:active { transform: translateY(1px); }
+  .btn.secondary {
+    background: transparent;
+    color: var(--fg);
+    border: 1px solid var(--panel-line);
+  }
+  .btn:disabled { opacity: .5; cursor: default; }
+  .btnrow { display: flex; gap: 8px; }
+  .btnrow .btn { flex: 1; }
+
+  label.field-label {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--dim);
+  }
+  input[type="text"] {
+    font-family: var(--mono);
+    font-size: 16px; /* >=16px avoids iOS zoom-on-focus */
+    color: var(--fg);
+    background: var(--bg);
+    border: 1px solid var(--panel-line);
+    border-radius: 8px;
+    padding: 12px;
+    width: 100%;
+    caret-color: var(--accent);
+  }
+  input[type="text"]::placeholder { color: var(--dim); }
+  input[type="text"]:focus { outline: none; border-color: var(--accent); }
+
+  /* ---- chat input row (replaces controls once connected) ---- */
+  .chatrow {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .chatrow .prompt { font-family: var(--mono); color: var(--accent); font-weight: 600; }
+  .chatrow input[type="text"] { flex: 1; }
+  .chatrow .send {
+    font-family: var(--mono);
+    font-weight: 600;
+    background: var(--accent);
+    color: var(--bg);
+    border: none;
+    border-radius: 8px;
+    padding: 0 16px;
+    height: 46px;
+    cursor: pointer;
+  }
+  .chatrow .send:disabled { opacity: .4; }
+
+  ::-webkit-scrollbar { width: 8px; }
+  ::-webkit-scrollbar-thumb { background: var(--panel-line); border-radius: 4px; }
+</style>
+</head>
+<body>
+  <div class="app">
+    <div class="titlebar">
+      <div class="dot" id="dot"></div>
+      <div class="brand">termkeet</div>
+      <div class="status" id="status">neconectat</div>
+    </div>
+    <div class="log" id="log" aria-live="polite"></div>
+    <div class="controls" id="controls"></div>
+  </div>
+
+<script>
+'use strict'
+
+/*
+ * Termkeet — web (WebRTC) variant.
+ *
+ * Same idea as the desktop app: a private, minimal, P2P chat between two
+ * people, no accounts, no chat history kept anywhere. This variant runs in
+ * any phone/desktop browser instead of Electron, so it uses WebRTC's
+ * RTCDataChannel for the actual P2P connection (encrypted end-to-end via
+ * DTLS, same guarantee as Hyperswarm's Noise channels in the desktop app).
+ *
+ * WebRTC still needs a one-time handshake (an SDP "offer" and "answer")
+ * exchanged before two peers can talk directly — that's what a signaling
+ * server normally does. This page has no server or backend of any kind, on
+ * purpose: the handshake is exchanged as a link/code the two people send
+ * each other over whatever channel they like (WhatsApp, SMS, in person).
+ * Once connected, every message goes directly between the two browsers.
+ */
+
+const log = document.getElementById('log')
+const controls = document.getElementById('controls')
+const dot = document.getElementById('dot')
+const statusEl = document.getElementById('status')
+
+const ICE_SERVERS = [
+  {
+    urls: [
+      'stun:stun.l.google.com:19302',
+      'stun:stun1.l.google.com:19302',
+      'stun:stun.cloudflare.com:3478'
+    ]
+  },
+  // Public test TURN relay (Open Relay Project / metered.ca) — only used as a
+  // fallback when a direct path isn't reachable (e.g. strict carrier NATs). It
+  // only ever sees encrypted bytes: TURN relays packets, it is not part of the
+  // DTLS handshake and cannot read message content. These are shared public
+  // credentials on a free tier; if a cellular-network test can't connect, the
+  // relay is likely rate-limited — get a personal key at metered.ca (free,
+  // 20GB/mo) and drop it in here.
+  {
+    urls: [
+      'turn:staticauth.openrelay.metered.ca:80',
+      'turn:staticauth.openrelay.metered.ca:443',
+      'turn:staticauth.openrelay.metered.ca:443?transport=tcp'
+    ],
+    username: 'openrelayproject',
+    credential: 'openrelayproject'
+  }
+]
+
+let pc = null
+let dc = null
+let myName = 'anon'
+let peerName = 'peer'
+
+// ---------------- log helpers ----------------
+
+function timestamp () {
+  return new Date().toTimeString().slice(0, 5)
+}
+
+function addLine (cls, text) {
+  const div = document.createElement('div')
+  div.className = 'line ' + cls
+  div.textContent = text
+  log.appendChild(div)
+  log.scrollTop = log.scrollHeight
+}
+
+function addChat (name, text, self) {
+  const div = document.createElement('div')
+  div.className = 'line chat ' + (self ? 'self' : 'peer')
+  const ts = document.createElement('span')
+  ts.className = 'ts'
+  ts.textContent = timestamp()
+  const who = document.createElement('span')
+  who.className = 'who'
+  who.textContent = name
+  div.appendChild(ts)
+  div.appendChild(who)
+  div.appendChild(document.createTextNode(text))
+  log.appendChild(div)
+  log.scrollTop = log.scrollHeight
+}
+
+function setStatus (text, kind) {
+  statusEl.textContent = text
+  dot.className = 'dot' + (kind ? ' ' + kind : '')
+}
+
+// ---------------- SDP <-> short code ----------------
+
+function toBase64Url (buf) {
+  let bin = ''
+  const bytes = new Uint8Array(buf)
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i])
+  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+
+function fromBase64Url (str) {
+  const b64 = str.replace(/-/g, '+').replace(/_/g, '/').padEnd(str.length + (4 - str.length % 4) % 4, '=')
+  const bin = atob(b64)
+  const bytes = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i)
+  return bytes.buffer
+}
+
+async function packSDP (desc) {
+  const json = JSON.stringify({ t: desc.type, s: desc.sdp, n: myName })
+  if (typeof CompressionStream === 'function') {
+    const cs = new CompressionStream('gzip')
+    const writer = cs.writable.getWriter()
+    writer.write(new TextEncoder().encode(json))
+    writer.close()
+    const buf = await new Response(cs.readable).arrayBuffer()
+    return 'z' + toBase64Url(buf)
+  }
+  return 'p' + toBase64Url(new TextEncoder().encode(json).buffer)
+}
+
+async function unpackSDP (code) {
+  const kind = code[0]
+  const buf = fromBase64Url(code.slice(1))
+  let json
+  if (kind === 'z') {
+    const ds = new DecompressionStream('gzip')
+    const writer = ds.writable.getWriter()
+    writer.write(new Uint8Array(buf))
+    writer.close()
+    const out = await new Response(ds.readable).arrayBuffer()
+    json = new TextDecoder().decode(out)
+  } else {
+    json = new TextDecoder().decode(buf)
+  }
+  const obj = JSON.parse(json)
+  return { desc: { type: obj.t, sdp: obj.s }, name: (obj.n || 'peer').slice(0, 40) }
+}
+
+// Accept either a raw code or a full shared link containing it.
+function extractCode (input, param) {
+  const trimmed = input.trim()
+  const hashIdx = trimmed.indexOf('#')
+  const hash = hashIdx >= 0 ? trimmed.slice(hashIdx + 1) : trimmed
+  const params = new URLSearchParams(hash)
+  return params.get(param) || trimmed
+}
+
+function shareLink (param, code) {
+  return location.origin + location.pathname + '#' + param + '=' + code
+}
+
+// ---------------- WebRTC plumbing ----------------
+
+function waitIceComplete (peerConn) {
+  if (peerConn.iceGatheringState === 'complete') return Promise.resolve()
+  return new Promise((resolve) => {
+    const done = () => {
+      peerConn.removeEventListener('icegatheringstatechange', check)
+      clearTimeout(timer)
+      resolve()
+    }
+    const check = () => { if (peerConn.iceGatheringState === 'complete') done() }
+    peerConn.addEventListener('icegatheringstatechange', check)
+    const timer = setTimeout(done, 4500) // proceed with whatever we have
+  })
+}
+
+// Any failure anywhere in the connect flow — a thrown error, a rejected
+// promise, or a step that just never settles (a browser silently refusing
+// WebRTC, for instance) — must end up VISIBLE, never a silent freeze on
+// "se pregătește...". showFatal renders it; withWatchdog races a step
+// against a timeout so even a hang that throws nothing still surfaces.
+function showFatal (err) {
+  const detail = (err && (err.message || err.name)) || String(err)
+  addLine('err', '[!] ' + detail)
+  addLine('hint', '    reîncarcă pagina și încearcă din nou.')
+  setStatus('eroare', 'err')
+  console.error(err)
+}
+
+function withWatchdog (label, promise, ms) {
+  let timer
+  const timeout = new Promise((_, reject) => {
+    timer = setTimeout(() => reject(new Error(label + ' durează prea mult — browserul ar putea bloca WebRTC aici.')), ms)
+  })
+  return Promise.race([promise, timeout]).finally(() => clearTimeout(timer))
+}
+
+window.addEventListener('unhandledrejection', (e) => { showFatal(e.reason) })
+
+function createPeerConnection () {
+  if (typeof RTCPeerConnection !== 'function') {
+    throw new Error('acest browser nu suportă WebRTC (RTCPeerConnection lipsește).')
+  }
+  const conn = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+  conn.onconnectionstatechange = () => {
+    if (conn.connectionState === 'failed' || conn.connectionState === 'disconnected') {
+      addLine('err', '[!] conexiunea s-a întrerupt — reîncarcă pagina și încearcă din nou.')
+      setStatus('deconectat', 'err')
+    }
+  }
+  return conn
+}
+
+function wireDataChannel (channel) {
+  dc = channel
+  dc.onopen = () => {
+    setStatus('conectat cu ' + peerName, 'live')
+    addLine('sys', '[*] conexiune P2P deschisă — mesajele merg direct între voi, criptat.')
+    renderChat()
+  }
+  dc.onclose = () => {
+    addLine('sys', '[*] conversația s-a încheiat (' + peerName + ' a plecat).')
+    setStatus('deconectat', 'err')
+  }
+  dc.onmessage = (e) => {
+    try {
+      const msg = JSON.parse(e.data)
+      addChat(String(msg.name || peerName).slice(0, 40), String(msg.text || '').slice(0, 4000), false)
+    } catch (_) { /* ignore malformed frames */ }
+  }
+}
+
+// ---------------- flows ----------------
+
+function clearControls () { controls.innerHTML = '' }
+
+function landing () {
+  clearControls()
+  const create = document.createElement('button')
+  create.className = 'btn'
+  create.textContent = 'Creează o cameră nouă'
+  create.onclick = () => askNameThen(startCreate)
+
+  const or = document.createElement('div')
+  or.className = 'field-label'
+  or.style.textAlign = 'center'
+  or.textContent = 'sau'
+
+  const joinInput = document.createElement('input')
+  joinInput.type = 'text'
+  joinInput.placeholder = 'lipește aici linkul / codul primit'
+  joinInput.autocomplete = 'off'
+  joinInput.autocapitalize = 'off'
+
+  const join = document.createElement('button')
+  join.className = 'btn secondary'
+  join.textContent = 'Alătură-te'
+  join.onclick = () => {
+    const code = extractCode(joinInput.value, 'o')
+    if (!code) return
+    askNameThen((name) => startJoin(code, name))
+  }
+
+  controls.append(create, or, joinInput, join)
+}
+
+function askNameThen (next) {
+  clearControls()
+  const label = document.createElement('div')
+  label.className = 'field-label'
+  label.textContent = 'numele tău (îl vede celălalt)'
+  const input = document.createElement('input')
+  input.type = 'text'
+  input.placeholder = 'ex: Alex'
+  input.maxLength = 40
+  input.autocomplete = 'off'
+  const go = document.createElement('button')
+  go.className = 'btn'
+  go.textContent = 'Continuă'
+  go.onclick = () => {
+    myName = (input.value.trim() || 'anon').slice(0, 40)
+    Promise.resolve(next(myName)).catch(showFatal)
+  }
+  controls.append(label, input, go)
+  input.focus()
+}
+
+async function startCreate () {
+  clearControls()
+  addLine('sys', '[*] pregătesc camera...')
+  setStatus('se pregătește...')
+
+  const link = await withWatchdog('crearea camerei', (async () => {
+    pc = createPeerConnection()
+    const channel = pc.createDataChannel('chat')
+    wireDataChannel(channel)
+
+    const offer = await pc.createOffer()
+    await pc.setLocalDescription(offer)
+    await waitIceComplete(pc)
+
+    const code = await packSDP(pc.localDescription)
+    return shareLink('o', code)
+  })(), 10000)
+
+  addLine('sys', '[*] cameră creată. trimite link-ul de mai jos prietenului tău:')
+  renderShare(link, 'Trimite invitația', async () => {
+    clearControls()
+    const label = document.createElement('div')
+    label.className = 'field-label'
+    label.textContent = 'după ce prietenul tău îți trimite înapoi codul lui de răspuns, lipește-l aici:'
+    const input = document.createElement('input')
+    input.type = 'text'
+    input.placeholder = 'cod de răspuns'
+    input.autocomplete = 'off'
+    input.autocapitalize = 'off'
+    const go = document.createElement('button')
+    go.className = 'btn'
+    go.textContent = 'Conectează'
+    go.onclick = async () => {
+      const answerCode = extractCode(input.value, 'a')
+      if (!answerCode) return
+      go.disabled = true
+      try {
+        const { desc, name } = await unpackSDP(answerCode)
+        peerName = name
+        await pc.setRemoteDescription(desc)
+        addLine('sys', '[*] se stabilește conexiunea directă...')
+        setStatus('se conectează...')
+      } catch (err) {
+        addLine('err', '[!] cod invalid: ' + ((err && err.message) || err))
+        go.disabled = false
+      }
+    }
+    controls.append(label, input, go)
+  }, link)
+}
+
+async function startJoin (offerCode, name) {
+  clearControls()
+  addLine('sys', '[*] mă alătur camerei...')
+  setStatus('se pregătește...')
+  myName = name
+
+  let offer
+  try {
+    offer = await unpackSDP(offerCode)
+  } catch (err) {
+    addLine('err', '[!] linkul/codul nu e valid.')
+    landing()
+    return
+  }
+  peerName = offer.name
+
+  const code = await withWatchdog('conectarea la cameră', (async () => {
+    pc = createPeerConnection()
+    pc.ondatachannel = (e) => wireDataChannel(e.channel)
+
+    await pc.setRemoteDescription(offer.desc)
+    const answer = await pc.createAnswer()
+    await pc.setLocalDescription(answer)
+    await waitIceComplete(pc)
+
+    return packSDP(pc.localDescription)
+  })(), 10000)
+
+  addLine('sys', '[*] trimite codul de mai jos înapoi lui ' + peerName + ' ca să terminați conectarea:')
+  renderShare(null, 'Trimite codul de răspuns', null, code, 'termkeet — cod de răspuns:\n' + code + '\n\n(lipește-l în ecranul unde a fost creată camera)')
+  addLine('hint', '    aștept ca ' + peerName + ' să finalizeze conectarea...')
+  setStatus('în așteptare...')
+}
+
+// Renders a share/copy widget. If `link` is given, share/copy a full link;
+// otherwise share/copy the raw `rawCode` (used for the answer step, where
+// the recipient must paste it back rather than open it as a page).
+function renderShare (link, shareLabel, onManualNext, rawForCopy, shareTextOverride) {
+  const box = document.createElement('input')
+  box.type = 'text'
+  box.readOnly = true
+  box.value = link || rawForCopy
+  box.onclick = () => box.select()
+
+  const row = document.createElement('div')
+  row.className = 'btnrow'
+
+  const copyBtn = document.createElement('button')
+  copyBtn.className = 'btn secondary'
+  copyBtn.textContent = 'Copiază'
+  copyBtn.onclick = async () => {
+    const text = link || rawForCopy
+    try {
+      await navigator.clipboard.writeText(text)
+      copyBtn.textContent = 'Copiat ✓'
+      setTimeout(() => { copyBtn.textContent = 'Copiază' }, 1500)
+    } catch (_) {
+      box.select()
+      document.execCommand('copy')
+    }
+  }
+
+  const shareBtn = document.createElement('button')
+  shareBtn.className = 'btn'
+  shareBtn.textContent = shareLabel
+  shareBtn.onclick = async () => {
+    const text = shareTextOverride || ('termkeet — invitație la chat: ' + link)
+    try {
+      if (navigator.share) {
+        await navigator.share(link ? { title: 'termkeet', text: 'termkeet — invitație la chat', url: link } : { title: 'termkeet', text })
+      } else {
+        await navigator.clipboard.writeText(text)
+        shareBtn.textContent = 'Copiat ✓ (lipește-l în orice app)'
+        setTimeout(() => { shareBtn.textContent = shareLabel }, 2000)
+      }
+    } catch (_) { /* user cancelled share sheet — fine */ }
+  }
+
+  row.append(shareBtn, copyBtn)
+  controls.append(box, row)
+
+  if (onManualNext) {
+    const nextBtn = document.createElement('button')
+    nextBtn.className = 'btn secondary'
+    nextBtn.textContent = 'Am trimis-o →'
+    nextBtn.onclick = onManualNext
+    controls.append(nextBtn)
+  }
+}
+
+function renderChat () {
+  clearControls()
+  const row = document.createElement('div')
+  row.className = 'chatrow'
+
+  const prompt = document.createElement('span')
+  prompt.className = 'prompt'
+  prompt.textContent = '>'
+
+  const input = document.createElement('input')
+  input.type = 'text'
+  input.placeholder = 'scrie un mesaj...'
+  input.autocomplete = 'off'
+  input.maxLength = 2000
+
+  const send = document.createElement('button')
+  send.className = 'send'
+  send.textContent = 'Trimite'
+
+  function submit () {
+    const text = input.value.trim()
+    if (!text || !dc || dc.readyState !== 'open') return
+    dc.send(JSON.stringify({ name: myName, text }))
+    addChat(myName, text, true)
+    input.value = ''
+  }
+
+  send.onclick = submit
+  input.onkeydown = (e) => { if (e.key === 'Enter') submit() }
+
+  row.append(prompt, input, send)
+  controls.appendChild(row)
+  input.focus()
+}
+
+// ---------------- boot ----------------
+
+addLine('sys', 'termkeet — chat P2P direct între două telefoane.')
+addLine('sys', 'fără cont, fără server, fără istoric — doar voi doi.')
+
+const initialCode = extractCode(location.hash.slice(1), 'o')
+if (location.hash.includes('o=') && initialCode) {
+  addLine('sys', '[*] ai un link de invitație — alege un nume ca să te alături:')
+  askNameThen((name) => startJoin(initialCode, name))
+} else {
+  landing()
+}
+</script>
+</body>
+</html>
