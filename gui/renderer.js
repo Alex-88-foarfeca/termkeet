@@ -98,7 +98,7 @@ function redraw () {
   term.write('\r\x1b[2K')  // wipe the current input line
   term.clear()             // drop the scrollback above it
   term.write('\x1b[H\x1b[2J') // home the cursor + clear the screen
-  term.write(`${ANSI.dim}Poiana lui Iocan — ultimele ${HISTORY_MAX} mesaje${ANSI.reset}\r\n`)
+  term.write(`${ANSI.bold}Poiana lui Iocan${ANSI.reset} ${ANSI.cyan}— ultimele ${HISTORY_MAX} mesaje${ANSI.reset}\r\n`)
   if (headerExtra) term.write(headerExtra + '\r\n')
   for (const h of history) term.write(h + '\r\n')
   term.write(prompt + line) // restore prompt + whatever was being typed

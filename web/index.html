@@ -82,6 +82,18 @@
     border-bottom: 1px solid var(--panel-line);
     flex: none;
   }
+
+  /* thin notice: chat history is capped */
+  .histhint {
+    flex: none;
+    padding: 5px 16px;
+    font-family: var(--mono);
+    font-size: 10.5px;
+    color: var(--dim);
+    text-align: center;
+    background: var(--panel);
+    border-bottom: 1px solid var(--panel-line);
+  }
   .dot {
     width: 9px; height: 9px;
     border-radius: 50%;
@@ -254,6 +266,7 @@
       <div class="brand">Poiana lui Iocan</div>
       <div class="status" id="status">neconectat</div>
     </div>
+    <div class="histhint" id="histhint" hidden>se păstrează doar ultimele 20 de mesaje</div>
     <div class="log" id="log" aria-live="polite"></div>
     <div class="controls" id="controls"></div>
     <div class="overlay" id="overlay" style="display:none"></div>
@@ -284,6 +297,7 @@ const controls = document.getElementById('controls')
 const dot = document.getElementById('dot')
 const statusEl = document.getElementById('status')
 const overlayEl = document.getElementById('overlay')
+const histHintEl = document.getElementById('histhint')
 
 const ICE_SERVERS = [
   {
@@ -842,6 +856,8 @@ function renderShare (link, shareLabel, onManualNext, rawForCopy, shareTextOverr
 
 function renderChat () {
   clearControls()
+  histHintEl.textContent = 'se păstrează doar ultimele ' + MAX_HISTORY + ' de mesaje'
+  histHintEl.hidden = false
   const row = document.createElement('div')
   row.className = 'chatrow'
 
