@@ -23,6 +23,7 @@ const ANSI = {
 const term = new Terminal({
   cursorBlink: true,
   cursorStyle: 'block',
+  cursorInactiveStyle: 'block', // stay a solid block even when unfocused, not a hollow outline
   fontFamily: '"SF Mono", Menlo, Monaco, "Courier New", monospace',
   fontSize: 13,
   scrollback: 5000,
@@ -46,6 +47,16 @@ term.open(document.getElementById('terminal'))
 fitAddon.fit()
 term.focus()
 window.addEventListener('resize', () => fitAddon.fit())
+
+// xterm only blinks the cursor while the terminal holds focus. In a plain
+// chat window it's easy to lose focus (a click on the padding, the window
+// coming back from the background) and then the cursor just sits there
+// frozen — not very "terminal". Grab focus back whenever the window is
+// active and the user isn't mid-selection, so the block keeps blinking.
+window.addEventListener('focus', () => term.focus())
+document.addEventListener('mouseup', () => {
+  if (!term.hasSelection()) term.focus()
+})
 
 function writeln (str) {
   term.write(str + '\r\n')

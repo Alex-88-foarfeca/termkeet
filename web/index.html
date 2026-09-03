@@ -243,6 +243,7 @@ let pc = null
 let dc = null
 let myName = 'anon'
 let peerName = 'peer'
+let keepaliveTimer = null
 
 // ---------------- log helpers ----------------
 
@@ -352,8 +353,27 @@ function waitIceComplete (peerConn) {
     }
     const check = () => { if (peerConn.iceGatheringState === 'complete') done() }
     peerConn.addEventListener('icegatheringstatechange', check)
-    const timer = setTimeout(done, 4500) // proceed with whatever we have
+    const timer = setTimeout(done, 8000) // proceed with whatever we have
   })
+}
+
+// Keepalive: WebRTC's own ICE consent checks keep the transport alive in
+// theory, but on mobile data / strict NATs an *idle* DataChannel path still
+// gets its NAT mapping dropped after ~30-60s — which is why the chat used to
+// "die" if you didn't type for a bit. A tiny ping every 15s keeps the path
+// warm. These frames carry a `t` field and are filtered out before the chat
+// renderer ever sees them.
+function stopKeepalive () {
+  if (keepaliveTimer) { clearInterval(keepaliveTimer); keepaliveTimer = null }
+}
+
+function startKeepalive () {
+  stopKeepalive()
+  keepaliveTimer = setInterval(() => {
+    if (dc && dc.readyState === 'open') {
+      try { dc.send(JSON.stringify({ t: 'ping' })) } catch (_) {}
+    }
+  }, 15000)
 }
 
 // Any failure anywhere in the connect flow — a thrown error, a rejected
@@ -384,9 +404,33 @@ function createPeerConnection () {
     throw new Error('acest browser nu suportă WebRTC (RTCPeerConnection lipsește).')
   }
   const conn = new RTCPeerConnection({ iceServers: ICE_SERVERS })
+
+  // `disconnected` is almost always transient (a network blip, a phone
+  // switching towers/wifi). Only `failed` is terminal. So on `disconnected`
+  // we just flag it and wait — if it hasn't recovered after a grace period,
+  // then it's really gone. This stops a 1-second hiccup from telling the
+  // user to reload.
+  let dropTimer = null
+  const clearDrop = () => { if (dropTimer) { clearTimeout(dropTimer); dropTimer = null } }
+
   conn.onconnectionstatechange = () => {
-    if (conn.connectionState === 'failed' || conn.connectionState === 'disconnected') {
-      addLine('err', '[!] conexiunea s-a întrerupt — reîncarcă pagina și încearcă din nou.')
+    const s = conn.connectionState
+    if (s === 'connected') {
+      clearDrop()
+      if (dc && dc.readyState === 'open') setStatus('conectat cu ' + peerName, 'live')
+    } else if (s === 'disconnected') {
+      setStatus('conexiune instabilă…', 'err')
+      clearDrop()
+      dropTimer = setTimeout(() => {
+        if (conn.connectionState !== 'connected') {
+          addLine('err', '[!] conexiunea nu s-a restabilit — reîncărcați pagina și creați o cameră nouă.')
+          setStatus('deconectat', 'err')
+        }
+      }, 15000)
+    } else if (s === 'failed') {
+      clearDrop()
+      stopKeepalive()
+      addLine('err', '[!] conexiunea a eșuat — reîncărcați pagina și creați o cameră nouă.')
       setStatus('deconectat', 'err')
     }
   }
@@ -398,17 +442,24 @@ function wireDataChannel (channel) {
   dc.onopen = () => {
     setStatus('conectat cu ' + peerName, 'live')
     addLine('sys', '[*] conexiune P2P deschisă — mesajele merg direct între voi, criptat.')
+    startKeepalive()
     renderChat()
   }
   dc.onclose = () => {
+    stopKeepalive()
     addLine('sys', '[*] conversația s-a încheiat (' + peerName + ' a plecat).')
     setStatus('deconectat', 'err')
   }
   dc.onmessage = (e) => {
-    try {
-      const msg = JSON.parse(e.data)
-      addChat(String(msg.name || peerName).slice(0, 40), String(msg.text || '').slice(0, 4000), false)
-    } catch (_) { /* ignore malformed frames */ }
+    let msg
+    try { msg = JSON.parse(e.data) } catch (_) { return /* ignore malformed frames */ }
+    if (msg && (msg.t === 'ping' || msg.t === 'pong')) {
+      if (msg.t === 'ping' && dc.readyState === 'open') {
+        try { dc.send(JSON.stringify({ t: 'pong' })) } catch (_) {}
+      }
+      return
+    }
+    addChat(String(msg.name || peerName).slice(0, 40), String(msg.text || '').slice(0, 4000), false)
   }
 }
 
@@ -483,7 +534,7 @@ async function startCreate () {
 
     const code = await packSDP(pc.localDescription)
     return shareLink('o', code)
-  })(), 10000)
+  })(), 20000)
 
   addLine('sys', '[*] cameră creată. trimite link-ul de mai jos prietenului tău:')
   renderShare(link, 'Trimite invitația', async () => {
@@ -544,7 +595,7 @@ async function startJoin (offerCode, name) {
     await waitIceComplete(pc)
 
     return packSDP(pc.localDescription)
-  })(), 10000)
+  })(), 20000)
 
   addLine('sys', '[*] trimite codul de mai jos înapoi lui ' + peerName + ' ca să terminați conectarea:')
   renderShare(null, 'Trimite codul de răspuns', null, code, 'termkeet — cod de răspuns:\n' + code + '\n\n(lipește-l în ecranul unde a fost creată camera)')

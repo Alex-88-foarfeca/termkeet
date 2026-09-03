@@ -61,9 +61,12 @@ trade-off for having zero server in the loop.
 
 Direct phone-to-phone WebRTC connections usually just work, but not
 always — some mobile carrier networks (especially aggressive CGNAT) can
-block a direct path. The page includes a public STUN server plus a
-free public TURN relay ([openrelay.metered.ca](https://www.metered.ca/tools/openrelayproject/))
-as a fallback for that case. Even when traffic goes through that relay,
+block a direct path. The page includes public STUN servers plus a
+free public TURN relay ([Open Relay Project](https://www.metered.ca/tools/openrelay/),
+`staticauth.openrelay.metered.ca`) as a fallback for that case. Those are
+shared public credentials on a rate-limited free tier — if a cellular test
+can't connect, grab a personal key (free, 20 GB/mo) and drop it into
+`ICE_SERVERS`. Even when traffic goes through that relay,
 it only ever sees encrypted bytes — TURN relays packets, it isn't part
 of the encryption handshake and can't read message content. If a
 connection still fails for you two, that's the known limitation of a
@@ -73,7 +76,11 @@ serverless setup on some networks, not a bug in the page itself.
 
 - **Two people at a time.** The manual handshake is pairwise; a group
   chat would need every pair to exchange codes, which isn't built.
-- **No reconnect.** If either of you closes the tab, that room is gone —
-  reload and set up a new one.
+- **No auto-reconnect across a real drop.** A brief network blip (phone
+  switching wifi/towers) now recovers on its own — the page keeps the
+  connection warm with a 15s keepalive ping and waits out a `disconnected`
+  blip for 15s before giving up. But if either tab is closed, or the link
+  is down long enough to `fail`, that room is gone — reload and set up a
+  new one.
 - English is used in the desktop/CLI app; this page's copy is in
   Romanian since that's who it's for. Easy to change if needed.
