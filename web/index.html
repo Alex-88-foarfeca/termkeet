@@ -161,7 +161,7 @@
   }
   .caret {
     position: absolute;
-    bottom: 13px;
+    bottom: 15px;
     width: .6em;
     height: 1.05em;
     font-size: 16px;
@@ -170,8 +170,6 @@
     animation: blink 1s step-end infinite;
   }
   @media (prefers-reduced-motion: reduce) { .caret { animation: none; opacity: .7; } }
-  /* iOS/touch browsers seat the input text a touch lower — nudge the block up. */
-  @media (pointer: coarse) { .caret { bottom: 15px; } }
 
   /* ---- controls area ---- */
   .controls {
