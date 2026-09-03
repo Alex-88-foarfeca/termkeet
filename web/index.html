@@ -104,10 +104,11 @@
     text-overflow: ellipsis;
   }
 
-  /* ---- terminal log ---- */
+  /* ---- log ---- */
   .log {
     flex: 1 1 auto;
     overflow-y: auto;
+    overflow-x: hidden;
     padding: 14px 16px;
     font-family: var(--mono);
     font-size: 13.5px;
@@ -117,10 +118,33 @@
   .line.sys { color: var(--dim); }
   .line.err { color: var(--danger); }
   .line.hint { color: var(--dim); }
-  .line.chat .who { font-weight: 600; margin-right: 6px; }
-  .line.chat.self .who { color: var(--accent); }
-  .line.chat.peer .who { color: var(--accent2); }
-  .line.chat .ts { color: var(--dim); font-size: 11.5px; margin-right: 6px; }
+
+  /* ---- chat bubbles (WhatsApp-style: you right, peer left) ---- */
+  /* Each .msg is a full-width block row; the bubble is an inline-block
+     capped at 78% and aligned via text-align — this can never widen the
+     page the way flex intrinsic sizing can. */
+  .msg { margin: 4px 0; }
+  .msg.self { text-align: right; }
+  .msg .meta {
+    font-size: 10.5px;
+    color: var(--dim);
+    margin: 0 5px 2px;
+    font-family: var(--mono);
+  }
+  .msg .bubble {
+    display: inline-block;
+    max-width: 78%;
+    padding: 7px 10px;
+    border-radius: 11px;
+    font-family: var(--sans);
+    font-size: 14px;
+    line-height: 1.45;
+    text-align: left;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  .msg.self .bubble { background: var(--accent); color: #0b1a11; border-bottom-right-radius: 3px; }
+  .msg.peer .bubble { background: #232a33; color: var(--fg); border-bottom-left-radius: 3px; }
 
   @keyframes blink { 50% { opacity: 0; } }
 
@@ -146,6 +170,8 @@
     animation: blink 1s step-end infinite;
   }
   @media (prefers-reduced-motion: reduce) { .caret { animation: none; opacity: .7; } }
+  /* iOS/touch browsers seat the input text a touch lower — nudge the block up. */
+  @media (pointer: coarse) { .caret { bottom: 15px; } }
 
   /* ---- controls area ---- */
   .controls {
@@ -309,19 +335,26 @@ function addLine (cls, text) {
   log.scrollTop = log.scrollHeight
 }
 
+const MAX_HISTORY = 20 // keep only the last N chat bubbles on screen
+
 function addChat (name, text, self) {
-  const div = document.createElement('div')
-  div.className = 'line chat ' + (self ? 'self' : 'peer')
-  const ts = document.createElement('span')
-  ts.className = 'ts'
-  ts.textContent = timestamp()
-  const who = document.createElement('span')
-  who.className = 'who'
-  who.textContent = name
-  div.appendChild(ts)
-  div.appendChild(who)
-  div.appendChild(document.createTextNode(text))
-  log.appendChild(div)
+  const msg = document.createElement('div')
+  msg.className = 'msg ' + (self ? 'self' : 'peer')
+
+  const meta = document.createElement('div')
+  meta.className = 'meta'
+  meta.textContent = self ? timestamp() : (name + ' · ' + timestamp())
+
+  const bubble = document.createElement('div')
+  bubble.className = 'bubble'
+  bubble.textContent = text
+
+  msg.append(meta, bubble)
+  log.appendChild(msg)
+
+  const bubbles = log.querySelectorAll('.msg')
+  for (let i = 0; i < bubbles.length - MAX_HISTORY; i++) bubbles[i].remove()
+
   log.scrollTop = log.scrollHeight
 }
 
