@@ -75,17 +75,33 @@ function ask (p, handler) {
   line = ''
   prompt = p
   onSubmit = handler
-  term.write(prompt)
+  if (chatActive) redraw()
+  else term.write(prompt)
 }
 
-// Clear whatever the user has typed so far on the current line, print an
-// out-of-band announcement (a peer joining, an incoming message, ...) above
-// it, then restore the prompt and their in-progress input — the same trick
-// readline's clearLine/prompt(true) does in the plain-terminal CLI version.
-function announce (str) {
-  term.write('\r\x1b[K')
-  writeln(str)
-  term.write(prompt + line)
+// Chat scrollback is capped: only the last HISTORY_MAX lines (messages from
+// both sides, plus join/leave/error notices) are kept, so the window never
+// fills up. Once the chat starts, every new line clears and redraws that
+// window (name/room prompts before that use plain writes).
+const HISTORY_MAX = 20
+const history = []
+let chatActive = false
+let headerExtra = '' // e.g. the invite code, kept visible in the redraw header
+
+function record (str) {
+  history.push(str)
+  if (history.length > HISTORY_MAX) history.splice(0, history.length - HISTORY_MAX)
+  if (chatActive) redraw()
+}
+
+function redraw () {
+  term.write('\r\x1b[2K')  // wipe the current input line
+  term.clear()             // drop the scrollback above it
+  term.write('\x1b[H\x1b[2J') // home the cursor + clear the screen
+  term.write(`${ANSI.dim}Poiana lui Iocan — ultimele ${HISTORY_MAX} mesaje${ANSI.reset}\r\n`)
+  if (headerExtra) term.write(headerExtra + '\r\n')
+  for (const h of history) term.write(h + '\r\n')
+  term.write(prompt + line) // restore prompt + whatever was being typed
 }
 
 term.onData((data) => {
@@ -129,6 +145,9 @@ function askForRoom () {
         const topic = await window.termkeet.createRoom()
         writeln(`${ANSI.dim}room created. share this invite code:${ANSI.reset}`)
         writeln(`${ANSI.yellow}${topic}${ANSI.reset}`)
+        // keep the code in the chat header so it's still reachable after
+        // the screen is first redrawn
+        headerExtra = `${ANSI.dim}invite: ${ANSI.reset}${ANSI.yellow}${topic}${ANSI.reset}`
       } else {
         const topic = await window.termkeet.joinRoom(code)
         writeln(`${ANSI.dim}joining room ${topic.slice(0, 8)}...${ANSI.reset}`)
@@ -144,8 +163,8 @@ function askForRoom () {
 function askForName () {
   ask(`${ANSI.dim}your name: ${ANSI.reset}`, async (input) => {
     const name = await window.termkeet.setUsername(input.trim())
-    writeln(`${ANSI.dim}connecting to swarm...${ANSI.reset}`)
-    writeln('')
+    record(`${ANSI.dim}connecting to swarm...${ANSI.reset}`)
+    chatActive = true
     chatLoop(name)
   })
 }
@@ -161,21 +180,21 @@ function chatLoop (username) {
 window.termkeet.onEvent((payload) => {
   switch (payload.type) {
     case 'peer-connected':
-      announce(`${ANSI.dim}[peer ${payload.peerId} connected — ${payload.count} peer(s) online]${ANSI.reset}`)
+      record(`${ANSI.dim}[peer ${payload.peerId} connected — ${payload.count} peer(s) online]${ANSI.reset}`)
       break
     case 'peer-hello':
-      announce(`${ANSI.dim}[${payload.name} joined]${ANSI.reset}`)
+      record(`${ANSI.dim}[${payload.name} joined]${ANSI.reset}`)
       break
     case 'peer-disconnected':
-      announce(`${ANSI.dim}[${payload.name} disconnected — ${payload.count} peer(s) online]${ANSI.reset}`)
+      record(`${ANSI.dim}[${payload.name} disconnected — ${payload.count} peer(s) online]${ANSI.reset}`)
       break
     case 'chat': {
       const color = payload.self ? ANSI.green : ANSI.cyan
-      announce(`${ANSI.dim}[${timestamp()}]${ANSI.reset} ${color}${ANSI.bold}${payload.from}${ANSI.reset} ${payload.text}`)
+      record(`${ANSI.dim}[${timestamp()}]${ANSI.reset} ${color}${ANSI.bold}${payload.from}${ANSI.reset} ${payload.text}`)
       break
     }
     case 'error':
-      announce(`${ANSI.red}${payload.message}${ANSI.reset}`)
+      record(`${ANSI.red}${payload.message}${ANSI.reset}`)
       break
   }
 })
