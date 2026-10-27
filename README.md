@@ -9,13 +9,18 @@ and no chat history stored anywhere: peers find and talk to each other
 directly, over an encrypted connection (Noise protocol), and nothing is
 kept once the app closes.
 
-Three ways to run it:
+Four ways to run it:
 
 - **GUI** (`npm start`) — a real desktop window, styled to look and behave
   exactly like macOS Terminal: native title bar, dark theme, monospace
   font, and a genuine blinking block cursor (the terminal emulator is
   [xterm.js](https://xtermjs.org), not a fake). This is what most people
   should use on a Mac/PC.
+- **GUI, mIRC skin** (`npm run mirc`) — same Hyperswarm core, same P2P
+  flow, a completely different look: a classic late-90s/2000s mIRC-style
+  window (navy title bar, File menu, channel bar, white chat log with
+  colored nicks, a nicklist panel for the two of you). See
+  [gui-mirc/](gui-mirc/).
 - **CLI** (`npm run cli`) — the same chat, run directly inside your actual
   terminal (Terminal.app, iTerm, etc.), no window of its own.
 - **Web** ([web/index.html](web/index.html)) — a phone-friendly browser
@@ -24,9 +29,9 @@ Three ways to run it:
   — it's a different transport (WebRTC, not Hyperswarm), for reasons
   explained there.
 
-The GUI and CLI talk the same protocol over Hyperswarm and can chat with
-each other freely —
-the GUI is just a nicer front end on the same P2P core.
+The GUI, the mIRC-skin GUI and the CLI all talk the same protocol over
+Hyperswarm and can chat with each other freely — they're just different
+front ends on the same P2P core.
 
 ## Setup
 
@@ -50,6 +55,26 @@ terminal:
 2. **Your name** — whatever you want to be called in the chat.
 
 Then just type and hit Enter to send. `Ctrl+C` leaves.
+
+## Usage — GUI, mIRC skin
+
+```bash
+npm run mirc
+```
+
+Same flow as the GUI above, just driven through the one input line at the
+bottom instead of a question-and-answer prompt (type the invite code or
+leave it empty, Enter; type your name, Enter; then chat). `File` in the
+menu bar has:
+
+- **Kick user** — drops the other person's connection (there's only ever
+  one other person in the room, so no target to pick).
+- **Trivia** — placeholder for now, not built yet.
+- **Close chat** — leaves the room and goes back to the start screen.
+
+The last 20 lines are kept on screen (notices + messages from both
+sides); a connection idle for 45s with no traffic is flagged in the
+status bar before it's declared dropped.
 
 ## Usage — CLI
 

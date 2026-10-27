@@ -1,0 +1,238 @@
+<!doctype html>
+<html>
+<head>
+<meta charset="utf-8" />
+<title>Poiana lui Iocan</title>
+<style>
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100%;
+    overflow: hidden;
+    background: #c0c0c0;
+    font-family: Tahoma, "MS Sans Serif", Geneva, sans-serif;
+    font-size: 11px;
+    color: #000;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  .win {
+    height: 100vh;
+    display: flex;
+    flex-direction: column;
+    border: 1px solid #0a0a0a;
+  }
+
+  /* ---- classic blue title bar ---- */
+  .titlebar {
+    flex: none;
+    height: 22px;
+    display: flex;
+    align-items: center;
+    gap: 5px;
+    padding: 0 3px;
+    background: linear-gradient(to right, #0a246a, #3a6ea5 60%, #a6caf0);
+    color: #fff;
+    -webkit-app-region: drag;
+  }
+  .ticon { font-size: 12px; -webkit-app-region: no-drag; }
+  .ttext {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-weight: bold;
+    font-size: 11px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .tbtns { display: flex; gap: 2px; -webkit-app-region: no-drag; }
+  .tbtn {
+    width: 18px;
+    height: 16px;
+    font-family: Marlett, Tahoma, sans-serif;
+    font-size: 10px;
+    line-height: 1;
+    background: #c0c0c0;
+    border: 1px outset #e0e0e0;
+    cursor: pointer;
+    padding: 0;
+  }
+  .tbtn:active { border-style: inset; }
+  .tbtn-close:hover { background: #e81123; color: #fff; }
+
+  /* ---- menu bar ---- */
+  .menubar {
+    flex: none;
+    display: flex;
+    background: #c0c0c0;
+    border-bottom: 1px solid #808080;
+    padding: 1px 2px;
+    position: relative;
+  }
+  .menuitem {
+    padding: 2px 8px;
+    cursor: default;
+    position: relative;
+  }
+  .menuitem:hover, .menuitem.open { background: #0a246a; color: #fff; }
+  .menudrop {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    min-width: 140px;
+    background: #c0c0c0;
+    border: 1px outset #e0e0e0;
+    box-shadow: 2px 2px 4px rgba(0, 0, 0, .4);
+    z-index: 50;
+    padding: 2px;
+  }
+  .menuopt {
+    padding: 3px 10px;
+    cursor: default;
+    white-space: nowrap;
+  }
+  .menuopt:hover { background: #0a246a; color: #fff; }
+  .menuopt.disabled { color: #808080; cursor: default; }
+  .menuopt.disabled:hover { background: none; }
+  .menusep { height: 1px; background: #808080; border-bottom: 1px solid #fff; margin: 3px 2px; }
+
+  /* ---- channel bar ---- */
+  .chanbar { flex: none; padding: 3px 4px; background: #c0c0c0; }
+  .chanbar input {
+    width: 100%;
+    font-family: Tahoma, sans-serif;
+    font-size: 11px;
+    padding: 2px 4px;
+    border: 1px inset #e0e0e0;
+    background: #fff;
+    color: #000;
+  }
+
+  /* ---- main body: chat pane + nicklist ---- */
+  .body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    padding: 0 4px 4px;
+    gap: 4px;
+  }
+  .chatpane {
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    border: 1px inset #e0e0e0;
+    background: #fff;
+  }
+  .log {
+    flex: 1 1 auto;
+    overflow-y: auto;
+    padding: 3px 5px;
+    font-family: "Courier New", Consolas, monospace;
+    font-size: 12.5px;
+    line-height: 1.35;
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  .line { white-space: pre-wrap; word-break: break-word; }
+  .line .ts { color: #808080; }
+  .line.notice { color: #008000; }
+  .line.err { color: #ff0000; }
+  .line.code { color: #000; font-weight: bold; background: #ffffcc; padding: 1px 3px; }
+  .line.chat .nick { font-weight: bold; }
+  .line.chat.self .nick { color: #0000cc; }
+  .line.chat.peer .nick { color: #cc0000; }
+
+  .inputrow { flex: none; border-top: 1px solid #c0c0c0; padding: 3px; }
+  .inputrow input {
+    width: 100%;
+    font-family: "Courier New", Consolas, monospace;
+    font-size: 12.5px;
+    padding: 3px 4px;
+    border: 1px inset #e0e0e0;
+    background: #fff;
+    color: #000;
+  }
+  .inputrow input:disabled { background: #e8e8e8; color: #808080; }
+  .inputrow input:focus, .chanbar input:focus { outline: none; border-color: #000; }
+
+  .nicklist {
+    flex: none;
+    width: 140px;
+    display: flex;
+    flex-direction: column;
+    border: 1px inset #e0e0e0;
+    background: #fff;
+  }
+  .nickhead {
+    flex: none;
+    background: #c0c0c0;
+    border-bottom: 1px solid #808080;
+    padding: 2px 5px;
+    font-weight: bold;
+    font-size: 10.5px;
+  }
+  .nicks { flex: 1 1 auto; overflow-y: auto; padding: 2px 0; }
+  .nick {
+    padding: 2px 6px;
+    font-family: "Courier New", Consolas, monospace;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+  .nick.self { font-weight: bold; }
+
+  .statusbar {
+    flex: none;
+    padding: 2px 6px;
+    background: #c0c0c0;
+    border-top: 1px solid #fff;
+    box-shadow: inset 0 1px 0 #808080;
+    font-size: 10.5px;
+    color: #000;
+  }
+</style>
+</head>
+<body>
+  <div class="win">
+    <div class="titlebar">
+      <span class="ticon">💬</span>
+      <span class="ttext" id="titleText">Poiana lui Iocan - [neconectat]</span>
+      <div class="tbtns">
+        <button class="tbtn" id="btnMin" title="Minimizează">_</button>
+        <button class="tbtn" id="btnMax" title="Maximizează">□</button>
+        <button class="tbtn tbtn-close" id="btnClose" title="Închide">×</button>
+      </div>
+    </div>
+    <div class="menubar">
+      <div class="menuitem" id="menuFile">
+        File
+        <div class="menudrop" id="menuFileDrop" hidden>
+          <div class="menuopt" id="optKick">Kick user</div>
+          <div class="menuopt" id="optTrivia">Trivia</div>
+          <div class="menusep"></div>
+          <div class="menuopt" id="optClose">Close chat</div>
+        </div>
+      </div>
+    </div>
+    <div class="chanbar">
+      <input type="text" id="chanBox" readonly value="#poiana-lui-iocan" />
+    </div>
+    <div class="body">
+      <div class="chatpane">
+        <div class="log" id="log"></div>
+        <div class="inputrow">
+          <input type="text" id="msgInput" maxlength="2000" disabled autocomplete="off" />
+        </div>
+      </div>
+      <div class="nicklist">
+        <div class="nickhead" id="nickhead">Useri — 0</div>
+        <div class="nicks" id="nicks"></div>
+      </div>
+    </div>
+    <div class="statusbar" id="statusbar">neconectat</div>
+  </div>
+
+<script src="renderer.js"></script>
+</body>
+</html>
