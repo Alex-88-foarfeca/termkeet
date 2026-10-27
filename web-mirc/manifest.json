@@ -1,0 +1,14 @@
+{
+  "name": "Poiana lui Iocan — IRC",
+  "short_name": "Poiana IRC",
+  "description": "Chat P2P privat, stil mIRC — fără cont, fără server, fără istoric.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#c0c0c0",
+  "theme_color": "#0a246a",
+  "icons": [
+    { "src": "icons/icon-180.png", "sizes": "180x180", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any maskable" }
+  ]
+}
